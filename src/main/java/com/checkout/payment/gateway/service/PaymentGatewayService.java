@@ -2,6 +2,7 @@ package com.checkout.payment.gateway.service;
 
 import static com.checkout.payment.gateway.enums.PaymentStatus.AUTHORIZED;
 import static com.checkout.payment.gateway.enums.PaymentStatus.DECLINED;
+import static com.checkout.payment.gateway.enums.PaymentStatus.REJECTED;
 
 import com.checkout.payment.gateway.enums.PaymentStatus;
 import com.checkout.payment.gateway.exception.PaymentNotFoundException;
@@ -46,7 +47,7 @@ public class PaymentGatewayService {
     );
     var bankResponse = bankCommunicator.sendPayment(bankRequest, id);
 
-    var paymentStatus = PaymentStatus.REJECTED;
+    var paymentStatus = REJECTED;
     if (bankResponse.getStatusCode() == HttpStatusCode.valueOf(200)) {
       if (bankResponse.getBody().authorized()) {
         paymentStatus = AUTHORIZED;
@@ -57,7 +58,7 @@ public class PaymentGatewayService {
     var cardNumber = paymentRequest.cardNumber();
     var response =  new PostPaymentResponse(
         id,
-        paymentStatus,
+        paymentStatus.getName(),
         cardNumber.substring(cardNumber.length() - 4),
         paymentRequest.expiryMonth(),
         paymentRequest.expiryYear(),

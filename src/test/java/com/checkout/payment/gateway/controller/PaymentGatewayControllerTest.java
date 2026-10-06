@@ -3,7 +3,10 @@ package com.checkout.payment.gateway.controller;
 
 import static java.time.YearMonth.*;
 import static org.hamcrest.Matchers.containsString;
+import static org.hamcrest.Matchers.matchesPattern;
 import static org.junit.jupiter.params.provider.Arguments.arguments;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -11,7 +14,6 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.checkout.payment.gateway.enums.PaymentStatus;
 import com.checkout.payment.gateway.model.PostPaymentBankRequest;
 import com.checkout.payment.gateway.model.PostPaymentBankResponse;
-import com.checkout.payment.gateway.model.PostPaymentBankResponse.BankResponseStatus;
 import com.checkout.payment.gateway.model.PostPaymentRequest;
 import com.checkout.payment.gateway.model.PostPaymentResponse;
 import com.checkout.payment.gateway.repository.PaymentsRepository;
@@ -24,13 +26,14 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
-import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.test.web.servlet.MockMvc;
 
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders;
@@ -42,8 +45,6 @@ class PaymentGatewayControllerTest {
   @Autowired
   private MockMvc mvc;
   @Autowired
-  PaymentsRepository paymentsRepository;
-  @Autowired
   ObjectMapper objectMapper;
   @MockBean
   BankCommunicator bankCommunicator;
@@ -53,33 +54,55 @@ class PaymentGatewayControllerTest {
   private static final String CURRENCY = "GBP";
   private static final int AMOUNT = 1;
   private static final String CVV = "123";
+  private static final String UUID_PATTERN =
+      "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}";
 
-  private PostPaymentRequest validRequest() {
+  private PostPaymentRequest validPostRequest() {
     return new PostPaymentRequest(CARD_NUMBER, EXPIRY_MONTH, futureYear, CURRENCY, AMOUNT, CVV);
   }
 
   @Test
-  void whenPaymentWithIdExistThenCorrectPaymentIsReturned() throws Exception {
-    var payment = new PostPaymentResponse(
-        UUID.randomUUID(), PaymentStatus.AUTHORIZED, "4321", 12, futureYear, "USD", 10);
+  void whenPaymentProcessAuthorizedThenGetPaymentReturnsIt() throws Exception {
+    var request = validPostRequest();
+    var bankRequest = new PostPaymentBankRequest(
+        request.cardNumber(),
+        request.getExpiryDate(),
+        request.currency(),
+        request.amount(),
+        request.cvv());
+    var bankResponse = new ResponseEntity<>(
+        new PostPaymentBankResponse(true, "0bb07405-6d44-4b50-a14f-7ae0beff13ad"), HttpStatus.OK);
+    when(bankCommunicator.sendPayment(eq(bankRequest), any())).thenReturn(bankResponse);
 
-    paymentsRepository.add(payment);
-
-    mvc.perform(MockMvcRequestBuilders.get("/payment/" + payment.id()))
+    var postResponse = mvc.perform(MockMvcRequestBuilders.post("/payment")
+            .contentType(MediaType.APPLICATION_JSON)
+            .content(objectMapper.writeValueAsString(request)))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$.status").value(payment.status().getName()))
-        .andExpect(jsonPath("$.cardNumberLastFour").value(payment.cardNumberLastFour()))
-        .andExpect(jsonPath("$.expiryMonth").value(payment.expiryMonth()))
-        .andExpect(jsonPath("$.expiryYear").value(payment.expiryYear()))
-        .andExpect(jsonPath("$.currency").value(payment.currency()))
-        .andExpect(jsonPath("$.amount").value(payment.amount()));
+        .andExpect(jsonPath("$.id", matchesPattern(UUID_PATTERN)))
+        .andExpect(jsonPath("$.status").value(PaymentStatus.AUTHORIZED.getName()))
+        .andExpect(jsonPath("$.cardNumberLastFour").value("1111"))
+        .andExpect(jsonPath("$.expiryMonth").value(request.expiryMonth()))
+        .andExpect(jsonPath("$.expiryYear").value(request.expiryYear()))
+        .andExpect(jsonPath("$.currency").value(request.currency()))
+        .andExpect(jsonPath("$.amount").value(request.amount()))
+        .andReturn();
+
+    var paymentId = objectMapper.readValue(postResponse.getResponse().getContentAsString(), PostPaymentResponse.class).id();
+    mvc.perform(MockMvcRequestBuilders.get("/payment/" + paymentId))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.status").value(PaymentStatus.AUTHORIZED.getName()))
+        .andExpect(jsonPath("$.cardNumberLastFour").value("1111"))
+        .andExpect(jsonPath("$.expiryMonth").value(request.expiryMonth()))
+        .andExpect(jsonPath("$.expiryYear").value(request.expiryYear()))
+        .andExpect(jsonPath("$.currency").value(request.currency()))
+        .andExpect(jsonPath("$.amount").value(request.amount()));
   }
 
   @Test
   void whenPaymentWithIdDoesNotExistThen404IsReturned() throws Exception {
     mvc.perform(MockMvcRequestBuilders.get("/payment/" + UUID.randomUUID()))
         .andExpect(status().isNotFound())
-        .andExpect(jsonPath("$.message").value("Page not found"));
+        .andExpect(jsonPath("$.message").value("Payment not found"));
   }
 
   static Stream<Arguments> processPaymentCardNumberErrorProvider() {
@@ -124,7 +147,7 @@ class PaymentGatewayControllerTest {
             .content(objectMapper.writeValueAsString(request)))
         .andExpect(status().isUnprocessableEntity())
         .andExpect(jsonPath("$.message").value(
-            "expiry_month/expiry_year are required and must be in the future"));
+            "Rejected: expiry_month/expiry_year are required and must be in the future"));
   }
 
   static Stream<Arguments> processPaymentExpiryDateErrorProvider() {
@@ -146,11 +169,11 @@ class PaymentGatewayControllerTest {
             .content(objectMapper.writeValueAsString(request)))
         .andExpect(status().isUnprocessableEntity())
         .andExpect(jsonPath("$.message").value(
-            "expiry_month/expiry_year are required and must be in the future"));
+            "Rejected: expiry_month/expiry_year are required and must be in the future"));
   }
 
   // todo csv source for simplicity
-  static Stream<Arguments> procekssPaymentCurrencyErrorProvider() {
+  static Stream<Arguments> processPaymentCurrencyErrorProvider() {
     return Stream.of(
         arguments("AAA"),
         arguments("CAD"),
@@ -171,13 +194,14 @@ class PaymentGatewayControllerTest {
             .content(objectMapper.writeValueAsString(request)))
         .andExpect(status().isUnprocessableEntity())
         .andExpect(
-            jsonPath("$.message").value("currency is required and must be one of USD, EUR, GBP"));
+            jsonPath("$.message").value(
+                "Rejected: currency is required and must be one of USD, EUR, GBP"));
   }
 
   static Stream<Arguments> processPaymentAmountErrorProvider() {
-    var positiveError = "amount must be an integer greater than zero";
-    var requiredError = "amount is required";
-    var maxError = "JSON parse error: Numeric value (9223372036854775807) out of range of int (-2147483648 - 2147483647)";
+    var positiveError = "Rejected: amount must be an integer greater than zero";
+    var requiredError = "Rejected: amount is required";
+    var maxError = "Rejected: JSON parse error: Numeric value (9223372036854775807) out of range of int (-2147483648 - 2147483647)";
     // amount (raw json), error message
     return Stream.of(
         arguments(-1, positiveError),
@@ -190,7 +214,7 @@ class PaymentGatewayControllerTest {
   @MethodSource("processPaymentAmountErrorProvider")
   void whenPaymentProcessWithWrongAmountThen422IsReturned(Object amount, String errorMessage)
       throws Exception {
-    var request = validRequest();
+    var request = validPostRequest();
     ObjectNode body = objectMapper.valueToTree(request);
     body.set("amount", objectMapper.valueToTree(amount));
     mvc.perform(MockMvcRequestBuilders.post("/payment")
@@ -227,24 +251,25 @@ class PaymentGatewayControllerTest {
     }
   }
 
-  @ParameterizedTest
-  @CsvSource({"AUTHORIZED, Authorized", "UNAUTHORIZED, Declined", "FAILURE, Rejected"})
-  void whenPaymentProcessWithValidRequestThen200IsReturned(BankResponseStatus bankStatus, String resultStatus) throws Exception {
-    var request = validRequest();
+  @Test
+  void whenPaymentProcessWithValidRequestThenDeclinedIsReturned() throws Exception {
+    var request = validPostRequest();
     var bankRequest = new PostPaymentBankRequest(
         request.cardNumber(),
         request.getExpiryDate(),
         request.currency(),
         request.amount(),
         request.cvv());
-    var bankResponse = new PostPaymentBankResponse(bankStatus, "0bb07405-6d44-4b50-a14f-7ae0beff13ad");
-    when(bankCommunicator.sendPayment(bankRequest)).thenReturn(bankResponse);
+    var bankResponse = new ResponseEntity<>(new PostPaymentBankResponse(false, null),
+        HttpStatus.OK);
+    when(bankCommunicator.sendPayment(eq(bankRequest), any())).thenReturn(bankResponse);
 
     mvc.perform(MockMvcRequestBuilders.post("/payment")
             .contentType(MediaType.APPLICATION_JSON)
             .content(objectMapper.writeValueAsString(request)))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$.status").value(resultStatus))
+        .andExpect(jsonPath("$.id", matchesPattern(UUID_PATTERN)))
+        .andExpect(jsonPath("$.status").value(PaymentStatus.DECLINED.getName()))
         .andExpect(jsonPath("$.cardNumberLastFour").value("1111"))
         .andExpect(jsonPath("$.expiryMonth").value(request.expiryMonth()))
         .andExpect(jsonPath("$.expiryYear").value(request.expiryYear()))

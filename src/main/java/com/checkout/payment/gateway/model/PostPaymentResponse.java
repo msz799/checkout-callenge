@@ -5,7 +5,7 @@ import java.util.UUID;
 
 public record PostPaymentResponse(
     UUID id,
-    PaymentStatus status,
+    String status,
     String cardNumberLastFour,
     int expiryMonth,
     int expiryYear,

@@ -30,7 +30,7 @@ public class CommonExceptionHandler {
     var message = ex.getBindingResult().getFieldErrors().stream()
         .map(FieldError::getDefaultMessage)
         .collect(Collectors.joining(", "));
-    message = "%s: %s".formatted(PaymentStatus.REJECTED, message);
+    message = "%s: %s".formatted(PaymentStatus.REJECTED.getName(), message);
     return new ResponseEntity<>(new ErrorResponse(message), HttpStatus.UNPROCESSABLE_ENTITY);
   }
 
@@ -39,7 +39,7 @@ public class CommonExceptionHandler {
   @ExceptionHandler(HttpMessageNotReadableException.class)
   public ResponseEntity<ErrorResponse> handleException(HttpMessageNotReadableException ex) {
     LOG.error("Failed to read payment request: ", ex);
-    var message = "%s: %s".formatted(PaymentStatus.REJECTED, ex.getMessage());
+    var message = "%s: %s".formatted(PaymentStatus.REJECTED.getName(), ex.getMessage());
     return new ResponseEntity<>(new ErrorResponse(message), HttpStatus.UNPROCESSABLE_ENTITY);
   }
 
