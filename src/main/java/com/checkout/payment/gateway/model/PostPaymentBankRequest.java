@@ -10,4 +10,11 @@ public record PostPaymentBankRequest(
     String currency,
     Integer amount,
     String cvv) {
+
+  @Override
+  public String toString() {
+    var cardNumberLastFour = cardNumber.substring(cardNumber.length() - 4);
+    return "PostPaymentBankRequest[cardNumber=%s, expiryDate=%s, currency=%s, amount=%s, cvv=***]"
+        .formatted(cardNumberLastFour, expiryDate, currency, amount);
+  }
 }

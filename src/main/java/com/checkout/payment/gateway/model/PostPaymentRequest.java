@@ -33,7 +33,7 @@ public record PostPaymentRequest(
 
   @JsonIgnore()
   public String getExpiryDate() {
-    return String.format("%d/%d", expiryMonth, expiryYear);
+    return String.format("%02d/%d", expiryMonth, expiryYear);
   }
 
   @JsonIgnore
@@ -51,5 +51,13 @@ public record PostPaymentRequest(
   public boolean isCurrencyValid() {
     return currency != null && Arrays.stream(Currency.values())
         .anyMatch(c -> c.getCode().equals(currency));
+  }
+
+  @Override
+  public String toString() {
+    var maskedCardNumber = cardNumber == null || cardNumber.length() < 4
+        ? "***" : "***" + cardNumber.substring(cardNumber.length() - 4);
+    return "PostPaymentRequest[cardNumber=%s, expiryMonth=%d, expiryYear=%d, currency=%s, amount=%s, cvv=***]"
+        .formatted(maskedCardNumber, expiryMonth, expiryYear, currency, amount);
   }
 }

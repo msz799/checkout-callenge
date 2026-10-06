@@ -20,14 +20,15 @@ public class CommonExceptionHandler {
 
   @ExceptionHandler(PaymentNotFoundException.class)
   public ResponseEntity<ErrorResponse> handleException(PaymentNotFoundException ex) {
-    LOG.error("Payment with ID {} not found: ", ex.getPaymentId(), ex);
+    LOG.warn("Payment with ID {} not found", ex.getPaymentId());
     return new ResponseEntity<>(new ErrorResponse("Payment not found"), HttpStatus.NOT_FOUND);
   }
 
   @ExceptionHandler(MethodArgumentNotValidException.class)
   public ResponseEntity<ErrorResponse> handleException(MethodArgumentNotValidException ex) {
-    LOG.error("Failed to process payment: ", ex);
-    var message = ex.getBindingResult().getFieldErrors().stream()
+    var fieldErrors = ex.getBindingResult().getFieldErrors();
+    LOG.warn("Rejected payment request, invalid fields: {}", fieldErrors.stream().map(FieldError::getField).toList());
+    var message = fieldErrors.stream()
         .map(FieldError::getDefaultMessage)
         .collect(Collectors.joining(", "));
     message = "%s: %s".formatted(PaymentStatus.REJECTED.getName(), message);
@@ -38,7 +39,7 @@ public class CommonExceptionHandler {
   // e.g. a numeric value that does not fit the target type
   @ExceptionHandler(HttpMessageNotReadableException.class)
   public ResponseEntity<ErrorResponse> handleException(HttpMessageNotReadableException ex) {
-    LOG.error("Failed to read payment request: ", ex);
+    LOG.warn("Unreadable payment request: {}", ex.getMostSpecificCause().getClass().getSimpleName());
     var message = "%s: %s".formatted(PaymentStatus.REJECTED.getName(), ex.getMessage());
     return new ResponseEntity<>(new ErrorResponse(message), HttpStatus.UNPROCESSABLE_ENTITY);
   }

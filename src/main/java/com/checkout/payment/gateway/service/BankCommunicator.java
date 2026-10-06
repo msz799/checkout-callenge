@@ -28,7 +28,7 @@ public class BankCommunicator {
     LOG.info("Sending payment request with ID {} to acquiring bank", id);
     try {
       return restTemplate.postForEntity(url, request, PostPaymentBankResponse.class);
-    } catch (HttpServerErrorException e) {
+    } catch (Exception e) {
       throw new BankUnavailableException(e.getMessage(), id, e);
     }
   }

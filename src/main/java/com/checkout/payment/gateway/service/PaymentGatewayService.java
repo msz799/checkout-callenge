@@ -2,9 +2,8 @@ package com.checkout.payment.gateway.service;
 
 import static com.checkout.payment.gateway.enums.PaymentStatus.AUTHORIZED;
 import static com.checkout.payment.gateway.enums.PaymentStatus.DECLINED;
-import static com.checkout.payment.gateway.enums.PaymentStatus.REJECTED;
 
-import com.checkout.payment.gateway.enums.PaymentStatus;
+import com.checkout.payment.gateway.exception.BankUnavailableException;
 import com.checkout.payment.gateway.exception.PaymentNotFoundException;
 import com.checkout.payment.gateway.model.PostPaymentBankRequest;
 import com.checkout.payment.gateway.model.PostPaymentRequest;
@@ -13,7 +12,7 @@ import com.checkout.payment.gateway.repository.PaymentsRepository;
 import java.util.UUID;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.http.HttpStatusCode;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 
 @Service
@@ -37,7 +36,8 @@ public class PaymentGatewayService {
 
   public PostPaymentResponse processPayment(PostPaymentRequest paymentRequest) {
     var id = UUID.randomUUID();
-    LOG.info("Processing payment with ID={} card_number={}", id, paymentRequest.cardNumber());
+    var cardNumberLastFour = paymentRequest.cardNumber().substring(paymentRequest.cardNumber().length() - 4);
+    LOG.info("Processing payment with ID={} card_number={}", id, cardNumberLastFour);
     var bankRequest = new PostPaymentBankRequest(
         paymentRequest.cardNumber(),
         paymentRequest.getExpiryDate(),
@@ -47,19 +47,16 @@ public class PaymentGatewayService {
     );
     var bankResponse = bankCommunicator.sendPayment(bankRequest, id);
 
-    var paymentStatus = REJECTED;
-    if (bankResponse.getStatusCode() == HttpStatusCode.valueOf(200)) {
-      if (bankResponse.getBody().authorized()) {
-        paymentStatus = AUTHORIZED;
-      } else {
-        paymentStatus = DECLINED;
-      }
+    var body = bankResponse.getBody();
+    if (!HttpStatus.OK.equals(bankResponse.getStatusCode()) || body == null) {
+      throw new BankUnavailableException(
+          "Unexpected bank response: " + bankResponse.getStatusCode(), id);
     }
-    var cardNumber = paymentRequest.cardNumber();
+    var paymentStatus = body.authorized() ? AUTHORIZED : DECLINED;
     var response =  new PostPaymentResponse(
         id,
         paymentStatus.getName(),
-        cardNumber.substring(cardNumber.length() - 4),
+        cardNumberLastFour,
         paymentRequest.expiryMonth(),
         paymentRequest.expiryYear(),
         paymentRequest.currency(),

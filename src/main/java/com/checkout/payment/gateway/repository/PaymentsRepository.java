@@ -4,7 +4,6 @@ import com.checkout.payment.gateway.model.PostPaymentResponse;
 import java.util.HashMap;
 import java.util.Optional;
 import java.util.UUID;
-import com.checkout.payment.gateway.service.PaymentGatewayService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Repository;
