@@ -1,5 +1,8 @@
 package com.checkout.payment.gateway.model;
 
+/**
+ * API error response
+ */
 public class ErrorResponse {
   private final String message;
 

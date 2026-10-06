@@ -15,6 +15,9 @@ import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 
+/**
+ * Business logic for processing payments
+ */
 @Service
 public class PaymentGatewayService {
 

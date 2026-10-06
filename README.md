@@ -26,6 +26,8 @@ For documentation openAPI is included, and it can be found under the following u
 
 ## Considerations and assumptions
 The solution design follows the provided project structure (Controller → Service → Repository) which is well known and thus easy to understand for most developers.
+
+Technical documentation is added where the code is not self-explanatory. This maintains a clean codebase while adding useful information.
 #### API
 Api descriptions include summaries and valid examples.  This makes for easy use for any users or agents.
 

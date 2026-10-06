@@ -13,6 +13,9 @@ import org.springframework.web.bind.annotation.ControllerAdvice;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import java.util.stream.Collectors;
 
+/**
+ * Maps exceptions to API responses
+ */
 @ControllerAdvice
 public class CommonExceptionHandler {
 

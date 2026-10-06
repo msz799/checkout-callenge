@@ -13,6 +13,16 @@ import java.time.DateTimeException;
 import java.time.YearMonth;
 import java.util.Arrays;
 
+/**
+ * Request object for the API post payment request. All fields are required
+ *
+ * @param cardNumber  must be 14-19 numeric characters long
+ * @param expiryMonth the month the card expires, must be a digit between 1 and 12
+ * @param expiryYear  the year the card expires, expiry_month/expiry_year must be in the future
+ * @param currency    the three-letter currency code, one of USD, EUR or GBP
+ * @param amount      the amount charged in the minor currency unit, e.g. 500 is £5.00 when the currency is GBP
+ * @param cvv         the 3 or 4 digit security code on the back of the card
+ */
 public record PostPaymentRequest(
     @NotBlank(message = "card_number is required")
     @Pattern(regexp = "[0-9]{14,19}", message = "card_number must be 14-19 numeric characters long")

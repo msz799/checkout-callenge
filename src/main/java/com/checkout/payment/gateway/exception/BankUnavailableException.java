@@ -2,6 +2,9 @@ package com.checkout.payment.gateway.exception;
 
 import java.util.UUID;
 
+/**
+ * Indicates errors at the acquiring bank
+ */
 public class BankUnavailableException extends RuntimeException {
 
   private final UUID paymentId;
